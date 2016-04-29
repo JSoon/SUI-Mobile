@@ -7188,8 +7188,10 @@ Device/OS Detection
      *
      * @param {String} url url
      * @param {Boolean=} ignoreCache 是否强制请求不使用缓存，对 document 生效，默认是 false
+     * @param {String} direction 动画切换方向，默认是 DIRECTION.rightToLeft
+     * @param {Boolean=} isPushState 是否需要 pushState
      */
-    Router.prototype.load = function(url, ignoreCache) {
+    Router.prototype.load = function(url, ignoreCache, direction, isPushState) {
         if (ignoreCache === undefined) {
             ignoreCache = false;
         }
@@ -7198,7 +7200,7 @@ Device/OS Detection
             this._switchToSection(Util.getUrlFragment(url));
         } else {
             this._saveDocumentIntoCache($(document), location.href);
-            this._switchToDocument(url, ignoreCache);
+            this._switchToDocument(url, ignoreCache, isPushState, direction);
         }
     };
 
@@ -7277,13 +7279,13 @@ Device/OS Detection
         var context = this;
 
         if (cacheDocument) {
-            this._doSwitchDocument(url, isPushState, direction);
+            this._doSwitchDocument(url, direction, isPushState);
         } else {
             this._loadDocument(url, {
                 success: function($doc) {
                     try {
                         context._parseDocument(url, $doc);
-                        context._doSwitchDocument(url, isPushState, direction);
+                        context._doSwitchDocument(url, direction, isPushState);
                     } catch (e) {
                         location.href = url;
                     }
@@ -7304,11 +7306,11 @@ Device/OS Detection
      * - 如果需要 pushState，那么把最新的状态 push 进去并把当前状态更新为该状态
      *
      * @param {String} url 待切换的文档的 url
-     * @param {Boolean} isPushState 加载页面后是否需要 pushState，默认是 true
      * @param {String} direction 动画切换方向，默认是 DIRECTION.rightToLeft
+     * @param {Boolean} isPushState 加载页面后是否需要 pushState，默认是 true
      * @private
      */
-    Router.prototype._doSwitchDocument = function(url, isPushState, direction) {
+    Router.prototype._doSwitchDocument = function(url, direction, isPushState) {
         if (typeof isPushState === 'undefined') {
             isPushState = true;
         }
@@ -7835,6 +7837,8 @@ Device/OS Detection
 
         $(document).on('click', 'a', function(e) {
             var $target = $(e.currentTarget);
+            var url = $target.attr('href');
+            var ignoreCache = $target.attr('data-no-cache') === 'true';
 
             var filterResult = customClickFilter($target);
             if (!filterResult) {
@@ -7848,14 +7852,21 @@ Device/OS Detection
             e.preventDefault();
 
             if ($target.hasClass('back')) {
-                router.back();
+                /**
+                 * 点击cls*="back"的按钮时，加上是否ignoreCache的判断
+                 * 如果ignore，则从服务器加载新页面，否则从缓存加载
+                 * 
+                 * Edit by JSoon
+                 */
+                if (!ignoreCache) {
+                    router.back();
+                } else {
+                    router.load(url, ignoreCache, DIRECTION.leftToRight);
+                }
             } else {
-                var url = $target.attr('href');
                 if (!url || url === '#') {
                     return;
                 }
-
-                var ignoreCache = $target.attr('data-no-cache') === 'true';
 
                 router.load(url, ignoreCache);
             }
